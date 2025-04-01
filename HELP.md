@@ -10,6 +10,9 @@ For further reference, please consider the following sections:
 * [Spring Web](https://docs.spring.io/spring-boot/3.4.4/reference/web/servlet.html)
 * [Spring Data JPA](https://docs.spring.io/spring-boot/3.4.4/reference/data/sql.html#data.sql.jpa-and-spring-data)
 * [Spring Data JDBC](https://docs.spring.io/spring-boot/3.4.4/reference/data/sql.html#data.sql.jdbc)
+* [Validation](https://docs.spring.io/spring-boot/3.4.4/reference/io/validation.html)
+* [OAuth2 Resource Server](https://docs.spring.io/spring-boot/3.4.4/reference/web/spring-security.html#web.security.oauth2.server)
+* [Flyway Migration](https://docs.spring.io/spring-boot/3.4.4/how-to/data-initialization.html#howto.data-initialization.migration-tool.flyway)
 
 ### Guides
 The following guides illustrate how to use some features concretely:
@@ -22,6 +25,7 @@ The following guides illustrate how to use some features concretely:
 * [Building REST services with Spring](https://spring.io/guides/tutorials/rest/)
 * [Accessing Data with JPA](https://spring.io/guides/gs/accessing-data-jpa/)
 * [Using Spring Data JDBC](https://github.com/spring-projects/spring-data-examples/tree/master/jdbc/basics)
+* [Validation](https://spring.io/guides/gs/validating-form-input/)
 
 ### Maven Parent overrides
 
