@@ -36,10 +36,10 @@ public class User {
     
     @Column(name = "email", nullable = false, unique = true, length = 255)
     private String email;
-    
-    @Column(name = "mot_de_passe", nullable = false, length = 255)
-    private String motDePasse;
-    
+
+    @Column(name = "password", nullable = false, length = 255)
+    private String password;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "statut")
     private UserStatus statut = UserStatus.HORS_LIGNE;

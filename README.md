@@ -77,7 +77,7 @@ src/main/java/com/project/appchat/
 1. **Créer un Utilisateur** :
    - Via pgAdmin 4, exécuter :
    ```sql
-   INSERT INTO users (id, nom, prenom, nom_utilisateur, email, mot_de_passe, statut, date_inscription, role)
+   INSERT INTO users (id, nom, prenom, nom_utilisateur, email, password, statut, date_inscription, role)
    VALUES (gen_random_uuid(), 'Yonke', 'Tony', 'tonnyk', 'tonnyk@mail.com', 'password', 'EN_LIGNE', NOW(), 'USER');
    ```
 
@@ -99,6 +99,114 @@ src/main/java/com/project/appchat/
    ```sql
    SELECT * FROM messages ORDER BY date_envoi DESC;
    ```
+
+## Tester les Endpoints avec Postman
+
+Voici comment tester les différentes fonctionnalités de l'API avec Postman :
+
+### 1. Authentification
+
+#### Inscription (POST /api/auth/register)
+- Méthode : POST
+- URL : http://localhost:8080/api/auth/register
+- Headers : 
+  - Content-Type : application/json
+- Body (raw, JSON) :
+```json
+{
+    "nom": "Dupont",
+    "prenom": "Jean",
+    "email": "jean.dupont@example.com",
+    "password": "motdepasse123"
+}
+```
+
+#### Connexion (POST /api/auth/login)
+- Méthode : POST
+- URL : http://localhost:8080/api/auth/login
+- Headers : 
+  - Content-Type : application/json
+- Body (raw, JSON) :
+```json
+{
+    "email": "jean.dupont@example.com",
+    "password": "motdepasse123"
+}
+```
+- Réponse : Token JWT à utiliser pour les requêtes suivantes
+
+### 2. Gestion des Salons
+
+#### Créer un Salon (POST /api/salons)
+- Méthode : POST
+- URL : http://localhost:8080/api/salons
+- Headers : 
+  - Content-Type : application/json
+  - Authorization : Bearer {votre_token_jwt}
+- Body (raw, JSON) :
+```json
+{
+    "nom": "Salon Général",
+    "description": "Discussion générale"
+}
+```
+
+#### Lister les Salons (GET /api/salons)
+- Méthode : GET
+- URL : http://localhost:8080/api/salons
+- Headers : 
+  - Authorization : Bearer {votre_token_jwt}
+
+### 3. Messages
+
+#### Envoyer un Message dans un Salon (POST /api/messages)
+- Méthode : POST
+- URL : http://localhost:8080/api/messages
+- Headers : 
+  - Content-Type : application/json
+  - Authorization : Bearer {votre_token_jwt}
+- Body (raw, JSON) :
+```json
+{
+    "contenu": "Bonjour tout le monde !",
+    "salonId": "uuid_du_salon"
+}
+```
+
+#### Envoyer un Message Privé (POST /api/messages/private)
+- Méthode : POST
+- URL : http://localhost:8080/api/messages/private
+- Headers : 
+  - Content-Type : application/json
+  - Authorization : Bearer {votre_token_jwt}
+- Body (raw, JSON) :
+```json
+{
+    "contenu": "Message privé",
+    "destinataireId": "uuid_du_destinataire"
+}
+```
+
+### 4. Gestion des Utilisateurs
+
+#### Lister les Utilisateurs (GET /api/users)
+- Méthode : GET
+- URL : http://localhost:8080/api/users
+- Headers : 
+  - Authorization : Bearer {votre_token_jwt}
+
+#### Récupérer un Utilisateur (GET /api/users/{id})
+- Méthode : GET
+- URL : http://localhost:8080/api/users/{id}
+- Headers : 
+  - Authorization : Bearer {votre_token_jwt}
+
+### Conseils d'Utilisation
+
+1. Sauvegarder les requêtes dans une Collection Postman
+2. Utiliser l'environnement Postman pour stocker le token JWT
+3. Vérifier les réponses JSON pour le débogage
+4. Utiliser les variables d'environnement pour les URLs de base
 
 ## État d'Avancement
 

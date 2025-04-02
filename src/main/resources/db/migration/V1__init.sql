@@ -5,7 +5,7 @@ CREATE TABLE users (
     prenom VARCHAR(100) NOT NULL,
     nom_utilisateur VARCHAR(100) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
-    mot_de_passe VARCHAR(255) NOT NULL,
+    password VARCHAR(255) NOT NULL,
     statut VARCHAR(20) DEFAULT 'HORS_LIGNE',
     date_inscription TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     role VARCHAR(20) DEFAULT 'USER'

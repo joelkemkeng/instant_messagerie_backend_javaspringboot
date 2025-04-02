@@ -61,6 +61,13 @@ public class SecurityConfig {
                 .requestMatchers(new AntPathRequestMatcher("/app/**")).permitAll() // Autoriser les destinations de l'application
                 .requestMatchers(new AntPathRequestMatcher("/user/**")).permitAll() // Autoriser les messages utilisateur
                 .requestMatchers(new AntPathRequestMatcher("/h2-console/**")).permitAll() // Autoriser la console H2
+                .requestMatchers(new AntPathRequestMatcher("/*.html")).permitAll() // Autoriser les fichiers HTML
+                .requestMatchers(new AntPathRequestMatcher("/*.js")).permitAll() // Autoriser les fichiers JavaScript
+                .requestMatchers(new AntPathRequestMatcher("/*.css")).permitAll() // Autoriser les fichiers CSS
+                .requestMatchers(new AntPathRequestMatcher("/")).permitAll() // Autoriser la page d'accueil
+                .requestMatchers(new AntPathRequestMatcher("/test-api.html")).permitAll() // Autoriser spécifiquement test-api.html
+                .requestMatchers(new AntPathRequestMatcher("/static/**")).permitAll() // Autoriser les ressources statiques
+                .requestMatchers(new AntPathRequestMatcher("/public/**")).permitAll() // Autoriser les ressources publiques
                 .requestMatchers(new AntPathRequestMatcher("/api/admin/**")).hasRole("ADMIN")
                 .anyRequest().authenticated()
             );
