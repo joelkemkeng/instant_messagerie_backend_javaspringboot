@@ -1,5 +1,6 @@
 package com.project.appchat.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -29,7 +30,8 @@ public class Salon {
     @Column(name = "date_creation")
     private LocalDateTime dateCreation;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "createur_id", nullable = false)
+    @JsonIgnoreProperties({"email", "motDePasse", "dateInscription"})
     private User createur;
 }
