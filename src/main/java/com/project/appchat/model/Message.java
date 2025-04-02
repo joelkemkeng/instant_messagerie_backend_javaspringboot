@@ -1,6 +1,7 @@
 package com.project.appchat.model;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -11,6 +12,7 @@ import java.util.UUID;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 @Entity
 @Table(name = "messages")
 public class Message {
@@ -23,6 +25,7 @@ public class Message {
     private String contenu;
     
     @Column(name = "date_envoi")
+    @Builder.Default
     private LocalDateTime dateEnvoi = LocalDateTime.now();
     
     @ManyToOne

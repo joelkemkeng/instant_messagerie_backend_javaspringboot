@@ -3,7 +3,7 @@ package com.project.appchat.service;
 import com.project.appchat.model.ChatMessage;
 import com.project.appchat.model.Message;
 import com.project.appchat.model.Salon;
-import com.project.appchat.model.User;
+import com.project.appchat.repository.MessageRepository;
 import com.project.appchat.repository.SalonRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -18,6 +18,7 @@ public class ChatService {
 
     private final SimpMessagingTemplate messagingTemplate;
     private final MessageService messageService;
+    private final MessageRepository messageRepository;
     private final SalonRepository salonRepository;
 
     public ChatMessage processMessage(ChatMessage chatMessage) {

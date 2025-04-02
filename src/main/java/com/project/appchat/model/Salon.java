@@ -1,5 +1,6 @@
 package com.project.appchat.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -28,7 +29,8 @@ public class Salon {
     @Column(name = "date_creation")
     private LocalDateTime dateCreation = LocalDateTime.now();
     
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "createur_id", nullable = false)
+    @JsonIgnoreProperties({"email", "motDePasse", "dateInscription"})
     private User createur;
 }
