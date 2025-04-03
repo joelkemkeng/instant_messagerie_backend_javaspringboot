@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interface de Test API Chat</title>
+    <title>Chat Application</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -111,10 +111,14 @@
         .tab-content.active {
             display: block;
         }
+        #salons-list, #users-list {
+            max-height: 150px;
+            overflow-y: auto;
+        }
     </style>
 </head>
 <body>
-    <h1>Interface de Test API Chat</h1>
+    <h1>Application de Chat</h1>
     
     <div class="container">
         <div class="left-panel">
@@ -228,8 +232,9 @@
             </div>
             
             <div class="card">
-                <h2>Token JWT</h2>
-                <div id="jwt-token" class="response">Aucun token</div>
+                <h2>Session</h2>
+                <button onclick="logout()">Déconnexion</button>
+                <div id="jwt-token" class="response">Non connecté</div>
             </div>
         </div>
     </div>
@@ -237,82 +242,101 @@
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
     <script>
-        let token = '';
-        let currentUser = null;
-        let currentSalonId = null;
+        // Variables globales
+        let token = localStorage.getItem('authToken') || '';
+        let currentUser = JSON.parse(localStorage.getItem('currentUser')) || null;
+        let currentSalonId = localStorage.getItem('currentSalonId') || null;
         let selectedUserId = null;
         let stompClient = null;
-        
-        // Fonctions d'authentification
-        function register() {
+
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', () => {
+            if (token) {
+                document.getElementById('jwt-token').textContent = token;
+                getSalons();
+                getUsers();
+                connectWebSocket();
+            }
+        });
+
+        // Authentification
+        async function register() {
             const userData = {
                 nom: document.getElementById('nom').value,
                 prenom: document.getElementById('prenom').value,
                 email: document.getElementById('email').value,
                 password: document.getElementById('password').value
             };
-            
-            fetch('http://localhost:8080/api/auth/register', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(userData)
-            })
-            .then(response => response.json())
-            .then(data => {
+
+            try {
+                const response = await fetch('http://localhost:8080/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData)
+                });
+                const data = await response.json();
                 document.getElementById('register-response').textContent = JSON.stringify(data, null, 2);
-                // Auto-fill login fields
                 document.getElementById('login-email').value = userData.email;
-                document.getElementById('login-password').value = userData.password;
-                // Switch to login tab
-                openTab({currentTarget: document.querySelectorAll('.tab')[1]}, 'login');
-            })
-            .catch(error => {
+                openTab({currentTarget: document.querySelector('.tab:nth-child(2)')}, 'login');
+            } catch (error) {
                 document.getElementById('register-response').textContent = 'Erreur: ' + error.message;
-            });
+            }
         }
-        
-        function login() {
+
+        async function login() {
             const loginData = {
                 email: document.getElementById('login-email').value,
                 password: document.getElementById('login-password').value
             };
-            
-            fetch('http://localhost:8080/api/auth/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(loginData)
-            })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('login-response').textContent = JSON.stringify(data, null, 2);
+
+            try {
+                const response = await fetch('http://localhost:8080/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(loginData)
+                });
+                const data = await response.json();
+                
                 if (data.token) {
                     token = data.token;
                     currentUser = {
                         id: data.userId,
                         email: loginData.email,
-                        nom: data.nom || '',
-                        prenom: data.prenom || ''
+                        nom: data.nom,
+                        prenom: data.prenom
                     };
+                    
+                    localStorage.setItem('authToken', token);
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    
                     document.getElementById('jwt-token').textContent = token;
-                    // Refresh salon list
+                    document.getElementById('login-response').textContent = "Connexion réussie!";
+                    
                     getSalons();
-                    // Refresh users list
                     getUsers();
+                    connectWebSocket();
                 }
-            })
-            .catch(error => {
+            } catch (error) {
                 document.getElementById('login-response').textContent = 'Erreur: ' + error.message;
-            });
+            }
         }
-        
-        // Fonctions de gestion des salons
-        function createSalon() {
+
+        function logout() {
+            token = '';
+            currentUser = null;
+            currentSalonId = null;
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('currentUser');
+            localStorage.removeItem('currentSalonId');
+            document.getElementById('jwt-token').textContent = 'Non connecté';
+            disconnectWebSocket();
+            location.reload();
+        }
+
+        // Gestion des salons
+        async function createSalon() {
             if (!token) {
-                alert('Vous devez être connecté pour créer un salon');
+                alert('Vous devez être connecté');
                 return;
             }
             
@@ -320,104 +344,89 @@
                 nom: document.getElementById('salon-nom').value,
                 description: document.getElementById('salon-description').value
             };
-            
-            fetch('http://localhost:8080/api/salons', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + token
-                },
-                body: JSON.stringify(salonData)
-            })
-            .then(response => response.json())
-            .then(data => {
+
+            try {
+                const response = await fetch('http://localhost:8080/api/salons', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify(salonData)
+                });
+                const data = await response.json();
                 document.getElementById('create-salon-response').textContent = JSON.stringify(data, null, 2);
-                // Refresh salon list
                 getSalons();
-            })
-            .catch(error => {
+            } catch (error) {
                 document.getElementById('create-salon-response').textContent = 'Erreur: ' + error.message;
-            });
-        }
-        
-        function getSalons() {
-            if (!token) {
-                alert('Vous devez être connecté pour voir les salons');
-                return;
             }
-            
-            fetch('http://localhost:8080/api/salons', {
-                method: 'GET',
-                headers: {
-                    'Authorization': 'Bearer ' + token
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('salons-list').textContent = JSON.stringify(data, null, 2);
-                
-                // Update salon dropdown
+        }
+
+        async function getSalons() {
+            if (!token) return;
+
+            try {
+                const response = await fetch('http://localhost:8080/api/salons', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const data = await response.json();
+
                 const salonSelect = document.getElementById('salon-select');
                 salonSelect.innerHTML = '<option value="">Sélectionnez un salon</option>';
-                
+
                 data.forEach(salon => {
                     const option = document.createElement('option');
                     option.value = salon.id;
                     option.textContent = salon.nom;
                     salonSelect.appendChild(option);
                 });
-            })
-            .catch(error => {
-                document.getElementById('salons-list').textContent = 'Erreur: ' + error.message;
-            });
+
+                document.getElementById('salons-list').textContent = JSON.stringify(data, null, 2);
+
+                if (currentSalonId) {
+                    salonSelect.value = currentSalonId;
+                    getSalonMessages(currentSalonId);
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+            }
         }
-        
-        function joinSalon() {
+
+        async function joinSalon() {
             const salonId = document.getElementById('salon-select').value;
             if (!salonId) {
                 alert('Veuillez sélectionner un salon');
                 return;
             }
-            
+
             currentSalonId = salonId;
+            localStorage.setItem('currentSalonId', salonId);
+            
             const salonName = document.querySelector(`#salon-select option[value="${salonId}"]`).textContent;
             document.getElementById('current-salon').textContent = salonName;
             
-            // Clear messages
             document.getElementById('salon-messages').innerHTML = '';
+            getSalonMessages(salonId);
             
-            // Subscribe to salon messages if WebSocket is connected
             if (stompClient && stompClient.connected) {
                 subscribeToSalon(salonId);
             }
-            
-            // Load previous messages
-            getSalonMessages(salonId);
         }
-        
-        // Fonctions de gestion des utilisateurs
-        function getUsers() {
-            if (!token) {
-                alert('Vous devez être connecté pour voir les utilisateurs');
-                return;
-            }
-            
-            fetch('http://localhost:8080/api/users', {
-                method: 'GET',
-                headers: {
-                    'Authorization': 'Bearer ' + token
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('users-list').textContent = JSON.stringify(data, null, 2);
-                
-                // Update user dropdown
+
+        // Gestion des utilisateurs
+        async function getUsers() {
+            if (!token) return;
+
+            try {
+                const response = await fetch('http://localhost:8080/api/users', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const data = await response.json();
+
                 const userSelect = document.getElementById('user-select');
                 userSelect.innerHTML = '<option value="">Sélectionnez un utilisateur</option>';
-                
+
                 data.forEach(user => {
-                    // Skip current user
                     if (currentUser && user.id === currentUser.id) return;
                     
                     const option = document.createElement('option');
@@ -425,237 +434,188 @@
                     option.textContent = `${user.prenom} ${user.nom}`;
                     userSelect.appendChild(option);
                 });
-            })
-            .catch(error => {
-                document.getElementById('users-list').textContent = 'Erreur: ' + error.message;
-            });
+
+                document.getElementById('users-list').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                console.error('Erreur:', error);
+            }
         }
-        
+
         function selectUser() {
             const userId = document.getElementById('user-select').value;
             if (!userId) {
                 alert('Veuillez sélectionner un utilisateur');
                 return;
             }
-            
+
             selectedUserId = userId;
             const userName = document.querySelector(`#user-select option[value="${userId}"]`).textContent;
             document.getElementById('current-user').textContent = userName;
             
-            // Clear messages
             document.getElementById('private-messages').innerHTML = '';
-            
-            // Load previous messages
             getPrivateMessages(userId);
         }
-        
-        // Fonctions de messagerie
-        function getSalonMessages(salonId) {
-            if (!token) {
-                alert('Vous devez être connecté pour voir les messages');
-                return;
-            }
-            
-            fetch(`http://localhost:8080/api/salons/${salonId}/messages`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': 'Bearer ' + token
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                const messagesContainer = document.getElementById('salon-messages');
-                messagesContainer.innerHTML = '';
-                
-                data.forEach(message => {
-                    addMessageToChat(message, messagesContainer, message.expediteur.id === currentUser.id);
+
+        // Messagerie
+        async function getSalonMessages(salonId) {
+            try {
+                const response = await fetch(`http://localhost:8080/api/salons/${salonId}/messages`, {
+                    headers: { 'Authorization': 'Bearer ' + token }
                 });
+                const messages = await response.json();
                 
-                // Scroll to bottom
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            })
-            .catch(error => {
-                console.error('Erreur lors de la récupération des messages:', error);
-            });
-        }
-        
-        function getPrivateMessages(userId) {
-            if (!token) {
-                alert('Vous devez être connecté pour voir les messages');
-                return;
-            }
-            
-            fetch(`http://localhost:8080/api/messages/private/${userId}`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': 'Bearer ' + token
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                const messagesContainer = document.getElementById('private-messages');
-                messagesContainer.innerHTML = '';
+                const container = document.getElementById('salon-messages');
+                container.innerHTML = '';
                 
-                data.forEach(message => {
-                    addMessageToChat(message, messagesContainer, message.expediteur.id === currentUser.id);
+                messages.forEach(msg => {
+                    addMessageToChat(msg, container, msg.expediteur.id === currentUser.id);
                 });
-                
-                // Scroll to bottom
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            })
-            .catch(error => {
-                console.error('Erreur lors de la récupération des messages privés:', error);
-            });
+                container.scrollTop = container.scrollHeight;
+            } catch (error) {
+                console.error('Erreur:', error);
+            }
         }
-        
+
+        async function getPrivateMessages(userId) {
+            try {
+                const response = await fetch(`http://localhost:8080/api/messages/private/${userId}`, {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const messages = await response.json();
+                
+                const container = document.getElementById('private-messages');
+                container.innerHTML = '';
+                
+                messages.forEach(msg => {
+                    addMessageToChat(msg, container, msg.expediteur.id === currentUser.id);
+                });
+                container.scrollTop = container.scrollHeight;
+            } catch (error) {
+                console.error('Erreur:', error);
+            }
+        }
+
         function sendSalonMessage() {
-            if (!token) {
-                alert('Vous devez être connecté pour envoyer un message');
+            const messageContent = document.getElementById('salon-message').value.trim();
+            if (!messageContent) {
+                alert('Le message ne peut pas être vide');
                 return;
             }
-            
             if (!currentSalonId) {
                 alert('Veuillez sélectionner un salon');
                 return;
             }
-            
-            const messageContent = document.getElementById('salon-message').value;
-            if (!messageContent.trim()) {
-                alert('Le message ne peut pas être vide');
-                return;
-            }
-            
-            const messageData = {
-                contenu: messageContent,
-                salonId: currentSalonId
-            };
-            
-            // Si WebSocket est connecté, envoyer via WebSocket
+
             if (stompClient && stompClient.connected) {
                 const chatMessage = {
                     content: messageContent,
-                    senderName: `${currentUser.prenom} ${currentUser.nom}`,
                     senderId: currentUser.id,
+                    senderName: `${currentUser.prenom} ${currentUser.nom}`,
                     roomId: currentSalonId,
-                    type: 'CHAT'
+                    type: 'CHAT',
+                    timestamp: new Date().toISOString()
                 };
-                
-                stompClient.send("/app/chat", {}, JSON.stringify(chatMessage));
-                document.getElementById('salon-message').value = '';
+                stompClient.send("/app/chat.sendMessage", {}, JSON.stringify(chatMessage));
             } else {
-                // Sinon, envoyer via REST API
                 fetch('http://localhost:8080/api/messages', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer ' + token
                     },
-                    body: JSON.stringify(messageData)
-                })
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('salon-message').value = '';
-                    // Refresh messages
-                    getSalonMessages(currentSalonId);
-                })
-                .catch(error => {
-                    console.error('Erreur lors de l\'envoi du message:', error);
-                });
+                    body: JSON.stringify({
+                        contenu: messageContent,
+                        salonId: currentSalonId
+                    })
+                }).then(() => getSalonMessages(currentSalonId))
+                .catch(error => console.error('Erreur:', error));
             }
+            document.getElementById('salon-message').value = '';
         }
-        
+
         function sendPrivateMessage() {
-            if (!token) {
-                alert('Vous devez être connecté pour envoyer un message');
+            const messageContent = document.getElementById('private-message').value.trim();
+            if (!messageContent) {
+                alert('Le message ne peut pas être vide');
                 return;
             }
-            
             if (!selectedUserId) {
                 alert('Veuillez sélectionner un utilisateur');
                 return;
             }
-            
-            const messageContent = document.getElementById('private-message').value;
-            if (!messageContent.trim()) {
-                alert('Le message ne peut pas être vide');
-                return;
+
+            if (stompClient && stompClient.connected) {
+                const chatMessage = {
+                    content: messageContent,
+                    senderId: currentUser.id,
+                    senderName: `${currentUser.prenom} ${currentUser.nom}`,
+                    recipientId: selectedUserId,
+                    type: 'PRIVATE',
+                    timestamp: new Date().toISOString()
+                };
+                stompClient.send("/app/chat.sendPrivateMessage", {}, JSON.stringify(chatMessage));
+            } else {
+                fetch('http://localhost:8080/api/messages/private', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify({
+                        contenu: messageContent,
+                        destinataireId: selectedUserId
+                    })
+                }).then(() => getPrivateMessages(selectedUserId))
+                .catch(error => console.error('Erreur:', error));
             }
-            
-            const messageData = {
-                contenu: messageContent,
-                destinataireId: selectedUserId
-            };
-            
-            fetch('http://localhost:8080/api/messages/private', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + token
-                },
-                body: JSON.stringify(messageData)
-            })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('private-message').value = '';
-                // Refresh messages
-                getPrivateMessages(selectedUserId);
-            })
-            .catch(error => {
-                console.error('Erreur lors de l\'envoi du message privé:', error);
-            });
+            document.getElementById('private-message').value = '';
         }
-        
-        // Fonctions WebSocket
+
+        // WebSocket
         function connectWebSocket() {
-            if (!token) {
-                alert('Vous devez être connecté pour utiliser WebSocket');
-                return;
-            }
-            
+            if (!token || stompClient) return;
+
             const socket = new SockJS('http://localhost:8080/ws');
             stompClient = Stomp.over(socket);
             
-            stompClient.connect({}, function(frame) {
-                document.getElementById('ws-status').textContent = 'Connecté: ' + frame;
-                document.getElementById('ws-connect').disabled = true;
-                document.getElementById('ws-disconnect').disabled = false;
-                
-                // Subscribe to user's private channel
-                if (currentUser) {
-                    stompClient.subscribe('/user/' + currentUser.id + '/queue/messages', function(message) {
-                        const messageData = JSON.parse(message.body);
-                        
-                        // Add message to private chat if sender is the selected user
-                        if (selectedUserId && messageData.senderId === selectedUserId) {
-                            const messagesContainer = document.getElementById('private-messages');
-                            addMessageToChat(messageData, messagesContainer, false);
-                            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            stompClient.connect(
+                { 'Authorization': 'Bearer ' + token }, 
+                (frame) => {
+                    console.log('Connected:', frame);
+                    document.getElementById('ws-status').textContent = 'Connecté: ' + frame;
+                    document.getElementById('ws-connect').disabled = true;
+                    document.getElementById('ws-disconnect').disabled = false;
+
+                    // Abonnement aux messages privés
+                    stompClient.subscribe(`/user/${currentUser.id}/queue/private`, (message) => {
+                        const msg = JSON.parse(message.body);
+                        if (selectedUserId && (msg.senderId === selectedUserId || msg.recipientId === selectedUserId)) {
+                            addMessageToChat(msg, document.getElementById('private-messages'), msg.senderId === currentUser.id);
                         }
                     });
+
+                    // Abonnement au salon courant
+                    if (currentSalonId) {
+                        subscribeToSalon(currentSalonId);
+                    }
+                },
+                (error) => {
+                    console.error('Erreur WebSocket:', error);
+                    document.getElementById('ws-status').textContent = 'Erreur de connexion';
+                    setTimeout(connectWebSocket, 5000); // Reconnexion automatique après 5s
                 }
-                
-                // Subscribe to current salon if any
-                if (currentSalonId) {
-                    subscribeToSalon(currentSalonId);
-                }
-            }, function(error) {
-                document.getElementById('ws-status').textContent = 'Erreur de connexion: ' + error;
-            });
+            );
         }
-        
+
         function subscribeToSalon(salonId) {
             if (!stompClient || !stompClient.connected) return;
             
-            stompClient.subscribe('/topic/room/' + salonId, function(message) {
-                const messageData = JSON.parse(message.body);
-                
-                // Add message to salon chat
-                const messagesContainer = document.getElementById('salon-messages');
-                addMessageToChat(messageData, messagesContainer, messageData.senderId === currentUser.id);
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            stompClient.subscribe(`/topic/room/${salonId}`, (message) => {
+                const msg = JSON.parse(message.body);
+                addMessageToChat(msg, document.getElementById('salon-messages'), msg.senderId === currentUser.id);
             });
         }
-        
+
         function disconnectWebSocket() {
             if (stompClient) {
                 stompClient.disconnect();
@@ -665,8 +625,30 @@
                 document.getElementById('ws-disconnect').disabled = true;
             }
         }
-        
-        // Fonctions utilitaires
+
+        // Utilitaires
+        function addMessageToChat(message, container, isSent) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+            
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'message-info';
+            
+            const senderName = message.senderName || 
+                              (message.expediteur ? `${message.expediteur.prenom} ${message.expediteur.nom}` : 'Inconnu');
+            const timestamp = message.timestamp || message.dateEnvoi || new Date().toISOString();
+            
+            infoDiv.textContent = `${senderName} - ${new Date(timestamp).toLocaleTimeString()}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.textContent = message.content || message.contenu;
+            
+            messageDiv.appendChild(infoDiv);
+            messageDiv.appendChild(contentDiv);
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
         function openTab(evt, tabName) {
             const tabContents = document.getElementsByClassName('tab-content');
             for (let i = 0; i < tabContents.length; i++) {
@@ -680,41 +662,6 @@
             
             document.getElementById(tabName).classList.add('active');
             evt.currentTarget.classList.add('active');
-        }
-        
-        function addMessageToChat(message, container, isSent) {
-            const messageDiv = document.createElement('div');
-            messageDiv.classList.add('message');
-            messageDiv.classList.add(isSent ? 'sent' : 'received');
-            
-            const infoDiv = document.createElement('div');
-            infoDiv.classList.add('message-info');
-            
-            // Format sender name based on message format
-            let senderName = '';
-            if (message.expediteur) {
-                senderName = `${message.expediteur.prenom} ${message.expediteur.nom}`;
-            } else if (message.senderName) {
-                senderName = message.senderName;
-            }
-            
-            // Format timestamp
-            let timestamp = '';
-            if (message.dateEnvoi) {
-                timestamp = new Date(message.dateEnvoi).toLocaleTimeString();
-            } else if (message.timestamp) {
-                timestamp = new Date(message.timestamp).toLocaleTimeString();
-            }
-            
-            infoDiv.textContent = `${senderName} - ${timestamp}`;
-            
-            const contentDiv = document.createElement('div');
-            contentDiv.textContent = message.contenu || message.content;
-            
-            messageDiv.appendChild(infoDiv);
-            messageDiv.appendChild(contentDiv);
-            
-            container.appendChild(messageDiv);
         }
     </script>
 </body>
