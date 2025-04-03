@@ -607,41 +607,48 @@
         
         // Fonctions WebSocket
         function connectWebSocket() {
-            if (!token) {
-                alert('Vous devez être connecté pour utiliser WebSocket');
-                return;
-            }
-            
-            const socket = new SockJS('http://localhost:8080/ws');
-            stompClient = Stomp.over(socket);
-            
-            stompClient.connect({}, function(frame) {
-                document.getElementById('ws-status').textContent = 'Connecté: ' + frame;
-                document.getElementById('ws-connect').disabled = true;
-                document.getElementById('ws-disconnect').disabled = false;
+    if (!token) {
+        alert('Vous devez être connecté pour utiliser WebSocket');
+        return;
+    }
+    
+    const socket = new SockJS('http://localhost:8080/ws');
+    stompClient = Stomp.over(socket);
+    
+    // Ajoutez les headers avec le token JWT
+    const headers = {
+        'Authorization': 'Bearer ' + token
+    };
+    
+    stompClient.connect(headers, function(frame) {  // Passez les headers ici
+        document.getElementById('ws-status').textContent = 'Connecté: ' + frame;
+        document.getElementById('ws-connect').disabled = true;
+        document.getElementById('ws-disconnect').disabled = false;
+        
+        // Subscribe to user's private channel
+        if (currentUser) {
+            stompClient.subscribe('/user/' + currentUser.id + '/queue/messages', function(message) {
+                const messageData = JSON.parse(message.body);
                 
-                // Subscribe to user's private channel
-                if (currentUser) {
-                    stompClient.subscribe('/user/' + currentUser.id + '/queue/messages', function(message) {
-                        const messageData = JSON.parse(message.body);
-                        
-                        // Add message to private chat if sender is the selected user
-                        if (selectedUserId && messageData.senderId === selectedUserId) {
-                            const messagesContainer = document.getElementById('private-messages');
-                            addMessageToChat(messageData, messagesContainer, false);
-                            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                        }
-                    });
+                if (selectedUserId && messageData.senderId === selectedUserId) {
+                    const messagesContainer = document.getElementById('private-messages');
+                    addMessageToChat(messageData, messagesContainer, false);
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
                 }
-                
-                // Subscribe to current salon if any
-                if (currentSalonId) {
-                    subscribeToSalon(currentSalonId);
-                }
-            }, function(error) {
-                document.getElementById('ws-status').textContent = 'Erreur de connexion: ' + error;
             });
         }
+        
+        if (currentSalonId) {
+            subscribeToSalon(currentSalonId);
+        }
+    }, function(error) {
+        console.error('Erreur WebSocket:', error);  // Meilleur logging
+        document.getElementById('ws-status').textContent = 'Erreur de connexion: ' + error;
+        
+        // Tentative de reconnexion après délai
+        setTimeout(connectWebSocket, 5000);
+    });
+}
         
         function subscribeToSalon(salonId) {
             if (!stompClient || !stompClient.connected) return;

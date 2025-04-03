@@ -10,7 +10,9 @@ import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
@@ -23,81 +25,81 @@ import java.util.List;
 import com.project.appchat.security.JwtTokenProvider;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Configuration
 @EnableWebSocketMessageBroker
 @EnableScheduling
 @RequiredArgsConstructor
+@Slf4j
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final JwtTokenProvider jwtTokenProvider;
 
-    @Override
-    public void registerStompEndpoints(@NonNull StompEndpointRegistry registry) {
-        registry.addEndpoint("/ws")
-                .setAllowedOrigins("*") // Configure this appropriately for production
-                .withSockJS()
-                .setHeartbeatTime(25000);
+    @Bean
+    public TaskScheduler taskScheduler() {
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setThreadNamePrefix("websocket-");
+        scheduler.setPoolSize(1);
+        scheduler.initialize();
+        return scheduler;
     }
 
     @Override
-    public void configureMessageBroker(@NonNull MessageBrokerRegistry registry) {
+    public void configureMessageBroker(MessageBrokerRegistry registry) {
         registry.setApplicationDestinationPrefixes("/app");
         registry.enableSimpleBroker("/topic", "/user")
                .setHeartbeatValue(new long[]{10000, 10000})
-               .setTaskScheduler(new org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler() {{
-                   setPoolSize(1);
-                   setThreadNamePrefix("ws-heartbeat-");
-                   initialize();
-               }});
+               .setTaskScheduler(taskScheduler()); // Appel direct de la méthode
+               
         registry.setUserDestinationPrefix("/user");
     }
-    
+
     @Override
-    public void configureWebSocketTransport(@NonNull WebSocketTransportRegistration registration) {
+    public void registerStompEndpoints(StompEndpointRegistry registry) {
+        registry.addEndpoint("/ws")
+                .setAllowedOriginPatterns("*")
+                .withSockJS()
+                .setHeartbeatTime(10000);
+    }
+
+    @Override
+    public void configureWebSocketTransport(WebSocketTransportRegistration registration) {
         registration.setMessageSizeLimit(128 * 1024);
         registration.setSendBufferSizeLimit(512 * 1024);
         registration.setSendTimeLimit(20000);
     }
-    
+
     @Override
-public void configureClientInboundChannel(@NonNull ChannelRegistration registration) {
-    registration.taskExecutor().corePoolSize(4).maxPoolSize(10);
-    registration.interceptors(new ChannelInterceptor() {
-        @Override
-        public Message<?> preSend(Message<?> message, MessageChannel channel) {
-            StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
-            if (StompCommand.CONNECT.equals(accessor.getCommand())) {
-                List<String> authorizationHeader = accessor.getNativeHeader("Authorization");
-                if (authorizationHeader != null && !authorizationHeader.isEmpty()) {
-                    String token = authorizationHeader.get(0).replace("Bearer ", "");
-                    if (jwtTokenProvider.validateToken(token)) {
-                        accessor.setUser(new UsernamePasswordAuthenticationToken(
-                            jwtTokenProvider.getEmailFromJWT(token),
-                            null,
-                            Collections.emptyList()
-                        ));
+    public void configureClientInboundChannel(ChannelRegistration registration) {
+        registration.interceptors(new ChannelInterceptor() {
+            @Override
+            public Message<?> preSend(Message<?> message, MessageChannel channel) {
+                StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+                if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
+                    List<String> authHeaders = accessor.getNativeHeader("Authorization");
+                    if (authHeaders != null && !authHeaders.isEmpty()) {
+                        String token = authHeaders.get(0).replace("Bearer ", "").trim();
+                        if (jwtTokenProvider.validateToken(token)) {
+                            accessor.setUser(new UsernamePasswordAuthenticationToken(
+                                jwtTokenProvider.getEmailFromJWT(token),
+                                null,
+                                Collections.emptyList()
+                            ));
+                        }
                     }
                 }
+                return message;
             }
-            return message;
-        }
-    });
-}
-    
-    @Override
-    public void configureClientOutboundChannel(@NonNull ChannelRegistration registration) {
-        registration.taskExecutor().corePoolSize(4).maxPoolSize(10);
+        });
     }
-    
+
     @Bean
     public ServletServerContainerFactoryBean createWebSocketContainer() {
         ServletServerContainerFactoryBean container = new ServletServerContainerFactoryBean();
-        container.setMaxTextMessageBufferSize(8192);
-        container.setMaxBinaryMessageBufferSize(8192);
-        container.setMaxSessionIdleTimeout(60000L);
+        container.setMaxTextMessageBufferSize(65536);
+        container.setMaxBinaryMessageBufferSize(65536);
+        container.setMaxSessionIdleTimeout(600000L);
         return container;
     }
-
-    
 }

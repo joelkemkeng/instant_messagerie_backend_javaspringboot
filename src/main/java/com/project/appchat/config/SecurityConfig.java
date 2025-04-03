@@ -18,6 +18,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -48,37 +53,49 @@ public class SecurityConfig {
     }
 
     @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOriginPatterns(List.of("*"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Cache-Control", "Content-Type"));
+        configuration.setAllowCredentials(true);
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+
+    @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(authorize -> authorize
                 .requestMatchers(new AntPathRequestMatcher("/api/auth/**")).permitAll()
                 .requestMatchers(new AntPathRequestMatcher("/api/public/**")).permitAll()
-                .requestMatchers(new AntPathRequestMatcher("/ws/**")).permitAll() // Autoriser les connexions WebSocket
-                .requestMatchers(new AntPathRequestMatcher("/topic/**")).permitAll() // Autoriser les destinations STOMP
-                .requestMatchers(new AntPathRequestMatcher("/app/**")).permitAll() // Autoriser les destinations de l'application
-                .requestMatchers(new AntPathRequestMatcher("/user/**")).permitAll() // Autoriser les messages utilisateur
-                .requestMatchers(new AntPathRequestMatcher("/h2-console/**")).permitAll() // Autoriser la console H2
-                .requestMatchers(new AntPathRequestMatcher("/*.html")).permitAll() // Autoriser les fichiers HTML
-                .requestMatchers(new AntPathRequestMatcher("/*.js")).permitAll() // Autoriser les fichiers JavaScript
-                .requestMatchers(new AntPathRequestMatcher("/*.css")).permitAll() // Autoriser les fichiers CSS
-                .requestMatchers(new AntPathRequestMatcher("/")).permitAll() // Autoriser la page d'accueil
-                .requestMatchers(new AntPathRequestMatcher("/test-api.html")).permitAll() // Autoriser spécifiquement test-api.html
+                .requestMatchers(new AntPathRequestMatcher("/ws/**")).permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/topic/**")).permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/app/**")).permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/user/**")).permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/h2-console/**")).permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/*.html")).permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/*.js")).permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/*.css")).permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/")).permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/test-api.html")).permitAll()
                 .requestMatchers(new AntPathRequestMatcher("/api/users/**")).hasAnyRole("USER", "ADMIN")
                 .requestMatchers(new AntPathRequestMatcher("/api/salons/**")).hasAnyRole("USER", "ADMIN")
-                .requestMatchers(new AntPathRequestMatcher("/api/messages/**")).hasAnyRole("USER", "ADMIN") // Autoriser les endpoints messages
-                .requestMatchers(new AntPathRequestMatcher("/api/chat/**")).hasAnyRole("USER", "ADMIN") // Autoriser les endpoints chat
-                .requestMatchers(new AntPathRequestMatcher("/static/**")).permitAll() // Autoriser les ressources statiques
-                .requestMatchers(new AntPathRequestMatcher("/public/**")).permitAll() // Autoriser les ressources publiques
+                .requestMatchers(new AntPathRequestMatcher("/api/messages/**")).hasAnyRole("USER", "ADMIN")
+                .requestMatchers(new AntPathRequestMatcher("/api/chat/**")).hasAnyRole("USER", "ADMIN")
+                .requestMatchers(new AntPathRequestMatcher("/static/**")).permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/public/**")).permitAll()
                 .requestMatchers(new AntPathRequestMatcher("/api/admin/**")).hasRole("ADMIN")
                 .anyRequest().authenticated()
             );
             
-        // Permettre les frames pour H2 Console
         http.headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable()));
-
         http.authenticationProvider(authenticationProvider());
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         
