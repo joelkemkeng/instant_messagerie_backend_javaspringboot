@@ -41,7 +41,7 @@ public class AuthService {
         user.setNom(registerRequest.getNom());
         user.setPrenom(registerRequest.getPrenom());
         user.setEmail(registerRequest.getEmail());
-        user.setMotDePasse(passwordEncoder.encode(registerRequest.getPassword()));
+        user.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
         
         // Définir le rôle (USER par défaut si non spécifié)
         if (registerRequest.getRole() != null) {

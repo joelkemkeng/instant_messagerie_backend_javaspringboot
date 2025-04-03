@@ -66,6 +66,10 @@ public class SecurityConfig {
                 .requestMatchers(new AntPathRequestMatcher("/*.css")).permitAll() // Autoriser les fichiers CSS
                 .requestMatchers(new AntPathRequestMatcher("/")).permitAll() // Autoriser la page d'accueil
                 .requestMatchers(new AntPathRequestMatcher("/test-api.html")).permitAll() // Autoriser spécifiquement test-api.html
+                .requestMatchers(new AntPathRequestMatcher("/api/users/**")).hasAnyRole("USER", "ADMIN")
+                .requestMatchers(new AntPathRequestMatcher("/api/salons/**")).hasAnyRole("USER", "ADMIN")
+                .requestMatchers(new AntPathRequestMatcher("/api/messages/**")).hasAnyRole("USER", "ADMIN") // Autoriser les endpoints messages
+                .requestMatchers(new AntPathRequestMatcher("/api/chat/**")).hasAnyRole("USER", "ADMIN") // Autoriser les endpoints chat
                 .requestMatchers(new AntPathRequestMatcher("/static/**")).permitAll() // Autoriser les ressources statiques
                 .requestMatchers(new AntPathRequestMatcher("/public/**")).permitAll() // Autoriser les ressources publiques
                 .requestMatchers(new AntPathRequestMatcher("/api/admin/**")).hasRole("ADMIN")

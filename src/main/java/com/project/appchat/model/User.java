@@ -4,24 +4,20 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-//import javax.persistence.*;
-
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
 @Table(name = "users")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "createdSalons", "joinedSalons", "messages"})
 public class User {
     
     @Id
@@ -50,7 +46,26 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(name = "role")
     private UserRole role = UserRole.USER;
-    
+
+    // Relations avec les salons
+    @OneToMany(mappedBy = "createur", cascade = CascadeType.ALL)
+    @JsonIgnoreProperties({"createur", "users", "messages"})
+    private Set<Salon> createdSalons = new HashSet<>();
+
+    @ManyToMany
+    @JoinTable(
+        name = "user_salons",
+        joinColumns = @JoinColumn(name = "user_id"),
+        inverseJoinColumns = @JoinColumn(name = "salon_id")
+    )
+    @JsonIgnoreProperties({"createur", "users", "messages"})
+    private Set<Salon> joinedSalons = new HashSet<>();
+
+    // Relations avec les messages
+    @OneToMany(mappedBy = "expediteur", cascade = CascadeType.ALL)
+    @JsonIgnoreProperties({"expediteur", "destinataire", "salon"})
+    private Set<Message> messages = new HashSet<>();
+
     public enum UserStatus {
         EN_LIGNE, HORS_LIGNE
     }

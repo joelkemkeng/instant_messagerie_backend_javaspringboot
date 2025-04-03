@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Data
 @NoArgsConstructor
@@ -30,13 +31,16 @@ public class Message {
     
     @ManyToOne
     @JoinColumn(name = "expediteur_id", nullable = false)
+    @JsonIgnoreProperties({"createdSalons", "joinedSalons", "messages"})
     private User expediteur;
     
     @ManyToOne
     @JoinColumn(name = "salon_id")
+    @JsonIgnoreProperties({"createur", "users", "messages"})
     private Salon salon;
     
     @ManyToOne
     @JoinColumn(name = "destinataire_id")
+    @JsonIgnoreProperties({"createdSalons", "joinedSalons", "messages"})
     private User destinataire;
 }

@@ -14,4 +14,5 @@ public interface SalonRepository extends JpaRepository<Salon, UUID> {
     Optional<Salon> findByNom(String nom);
     List<Salon> findByCreateur(User createur);
     boolean existsByNom(String nom);
+    Optional<List<Salon>> findByNomContainingIgnoreCase(String nom);
 }
