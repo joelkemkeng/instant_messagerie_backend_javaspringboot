@@ -53,13 +53,13 @@ public class User {
     private Set<Salon> createdSalons = new HashSet<>();
 
     @ManyToMany
-    @JoinTable(
-        name = "user_salons",
-        joinColumns = @JoinColumn(name = "user_id"),
-        inverseJoinColumns = @JoinColumn(name = "salon_id")
-    )
-    @JsonIgnoreProperties({"createur", "users", "messages"})
-    private Set<Salon> joinedSalons = new HashSet<>();
+@JoinTable(
+    name = "user_salons",
+    joinColumns = @JoinColumn(name = "user_id"),
+    inverseJoinColumns = @JoinColumn(name = "salon_id")
+)
+@JsonIgnoreProperties({"createur", "users", "messages"})
+private Set<Salon> joinedSalons = new HashSet<>();
 
     // Relations avec les messages
     @OneToMany(mappedBy = "expediteur", cascade = CascadeType.ALL)

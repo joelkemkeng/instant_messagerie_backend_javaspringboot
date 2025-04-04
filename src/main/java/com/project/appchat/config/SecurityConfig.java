@@ -22,7 +22,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.List;
+import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
@@ -55,9 +55,13 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("*"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Cache-Control", "Content-Type"));
+        configuration.setAllowedOrigins(Arrays.asList(
+            "http://localhost:8080", 
+            "http://127.0.0.1:5500",
+            "http://localhost:5500"
+        ));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Cache-Control", "Content-Type"));
         configuration.setAllowCredentials(true);
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -73,32 +77,33 @@ public class SecurityConfig {
             .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(authorize -> authorize
-                .requestMatchers(new AntPathRequestMatcher("/api/auth/**")).permitAll()
-                .requestMatchers(new AntPathRequestMatcher("/api/public/**")).permitAll()
-                .requestMatchers(new AntPathRequestMatcher("/ws/**")).permitAll()
-                .requestMatchers(new AntPathRequestMatcher("/topic/**")).permitAll()
-                .requestMatchers(new AntPathRequestMatcher("/app/**")).permitAll()
-                .requestMatchers(new AntPathRequestMatcher("/user/**")).permitAll()
-                .requestMatchers(new AntPathRequestMatcher("/h2-console/**")).permitAll()
-                .requestMatchers(new AntPathRequestMatcher("/*.html")).permitAll()
-                .requestMatchers(new AntPathRequestMatcher("/*.js")).permitAll()
-                .requestMatchers(new AntPathRequestMatcher("/*.css")).permitAll()
-                .requestMatchers(new AntPathRequestMatcher("/")).permitAll()
-                .requestMatchers(new AntPathRequestMatcher("/test-api.html")).permitAll()
+                .requestMatchers(
+                    new AntPathRequestMatcher("/api/auth/**"),
+                    new AntPathRequestMatcher("/api/public/**"),
+                    new AntPathRequestMatcher("/ws/**"),
+                    new AntPathRequestMatcher("/topic/**"),
+                    new AntPathRequestMatcher("/app/**"),
+                    new AntPathRequestMatcher("/user/**"),
+                    new AntPathRequestMatcher("/h2-console/**"),
+                    new AntPathRequestMatcher("/*.html"),
+                    new AntPathRequestMatcher("/*.js"),
+                    new AntPathRequestMatcher("/*.css"),
+                    new AntPathRequestMatcher("/"),
+                    new AntPathRequestMatcher("/test-api.html"),
+                    new AntPathRequestMatcher("/static/**"),
+                    new AntPathRequestMatcher("/public/**")
+                ).permitAll()
                 .requestMatchers(new AntPathRequestMatcher("/api/users/**")).hasAnyRole("USER", "ADMIN")
                 .requestMatchers(new AntPathRequestMatcher("/api/salons/**")).hasAnyRole("USER", "ADMIN")
                 .requestMatchers(new AntPathRequestMatcher("/api/messages/**")).hasAnyRole("USER", "ADMIN")
                 .requestMatchers(new AntPathRequestMatcher("/api/chat/**")).hasAnyRole("USER", "ADMIN")
-                .requestMatchers(new AntPathRequestMatcher("/static/**")).permitAll()
-                .requestMatchers(new AntPathRequestMatcher("/public/**")).permitAll()
                 .requestMatchers(new AntPathRequestMatcher("/api/admin/**")).hasRole("ADMIN")
                 .anyRequest().authenticated()
-            );
-            
-        http.headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable()));
-        http.authenticationProvider(authenticationProvider());
-        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-        
+            )
+            .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable()))
+            .authenticationProvider(authenticationProvider())
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
         return http.build();
     }
 }

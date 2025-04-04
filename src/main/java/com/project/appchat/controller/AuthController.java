@@ -8,8 +8,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -40,23 +41,44 @@ public class AuthController {
             Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(user.getEmail(), user.getPassword())
             );
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+            
+            User fullUser = userService.findByEmail(user.getEmail())
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+            
             String token = jwtTokenProvider.generateToken(authentication);
-            return ResponseEntity.ok(new AuthResponse(token));
+            
+            return ResponseEntity.ok(new AuthResponse(
+                token,
+                fullUser.getId(),
+                fullUser.getEmail(),
+                fullUser.getNom(),
+                fullUser.getPrenom()
+            ));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Invalid credentials");
+            return ResponseEntity.status(401).body("Identifiants invalides");
         }
     }
 
     private static class AuthResponse {
         private final String token;
+        private final UUID userId;
+        private final String email;
+        private final String nom;
+        private final String prenom;
 
-        public AuthResponse(String token) {
+        public AuthResponse(String token, UUID userId, String email, String nom, String prenom) {
             this.token = token;
+            this.userId = userId;
+            this.email = email;
+            this.nom = nom;
+            this.prenom = prenom;
         }
 
-        public String getToken() {
-            return token;
-        }
+        // Getters nécessaires pour la sérialisation JSON
+        public String getToken() { return token; }
+        public UUID getUserId() { return userId; }
+        public String getEmail() { return email; }
+        public String getNom() { return nom; }
+        public String getPrenom() { return prenom; }
     }
 }

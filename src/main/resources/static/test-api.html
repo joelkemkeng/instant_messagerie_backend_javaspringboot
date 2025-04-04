@@ -248,17 +248,15 @@
         let currentSalonId = localStorage.getItem('currentSalonId') || null;
         let selectedUserId = null;
         let stompClient = null;
+        let salonSubscriptions = new Map();
 
         // Initialisation
         document.addEventListener('DOMContentLoaded', () => {
             if (token) {
-                document.getElementById('jwt-token').textContent = token;
-                getSalons();
-                getUsers();
+                updateUIAfterLogin();
                 connectWebSocket();
             }
         });
-
         // Authentification
         async function register() {
             const userData = {
@@ -285,23 +283,32 @@
 
         async function login() {
             const loginData = {
-                email: document.getElementById('login-email').value,
-                password: document.getElementById('login-password').value
-            };
+        email: document.getElementById('login-email').value,
+        password: document.getElementById('login-password').value
+    };
 
-            try {
-                const response = await fetch('http://localhost:8080/api/auth/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(loginData)
-                });
+    try {
+        const response = await fetch('http://localhost:8080/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(loginData)
+        });
+
+        if (response.status === 401) {
+            throw new Error('Identifiants incorrects');
+        }
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
                 const data = await response.json();
                 
                 if (data.token) {
                     token = data.token;
                     currentUser = {
                         id: data.userId,
-                        email: loginData.email,
+                        email: data.email,
                         nom: data.nom,
                         prenom: data.prenom
                     };
@@ -309,16 +316,21 @@
                     localStorage.setItem('authToken', token);
                     localStorage.setItem('currentUser', JSON.stringify(currentUser));
                     
-                    document.getElementById('jwt-token').textContent = token;
-                    document.getElementById('login-response').textContent = "Connexion réussie!";
-                    
-                    getSalons();
-                    getUsers();
+                    updateUIAfterLogin();
                     connectWebSocket();
                 }
             } catch (error) {
-                document.getElementById('login-response').textContent = 'Erreur: ' + error.message;
+        document.getElementById('login-response').innerHTML = `
+            <div class="error-message">${error.message}</div>
+        `;
             }
+        }
+
+        function updateUIAfterLogin() {
+            document.getElementById('jwt-token').textContent = token.substring(0, 20) + '...';
+            document.getElementById('login-response').textContent = "Connecté en tant que " + currentUser.email;
+            getSalons();
+            getUsers();
         }
 
         function logout() {
@@ -363,12 +375,26 @@
         }
 
         async function getSalons() {
-            if (!token) return;
+            if (!token) {
+                console.error('No token available');
+                return;
+            }
 
             try {
                 const response = await fetch('http://localhost:8080/api/salons', {
-                    headers: { 'Authorization': 'Bearer ' + token }
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    }
                 });
+
+                if (!response.ok) {
+                    const error = await response.text();
+                    console.error('API Error:', error);
+                    document.getElementById('salons-list').textContent = 'Erreur: ' + error;
+                    return;
+                }
+
                 const data = await response.json();
 
                 const salonSelect = document.getElementById('salon-select');
@@ -389,6 +415,7 @@
                 }
             } catch (error) {
                 console.error('Erreur:', error);
+                document.getElementById('salons-list').textContent = 'Erreur: ' + error.message;
             }
         }
 
@@ -407,7 +434,8 @@
             
             document.getElementById('salon-messages').innerHTML = '';
             getSalonMessages(salonId);
-            
+
+            // Subscribe to salon messages if WebSocket is connected
             if (stompClient && stompClient.connected) {
                 subscribeToSalon(salonId);
             }
@@ -415,12 +443,26 @@
 
         // Gestion des utilisateurs
         async function getUsers() {
-            if (!token) return;
+            if (!token) {
+                console.error('No token available');
+                return;
+            }
 
             try {
                 const response = await fetch('http://localhost:8080/api/users', {
-                    headers: { 'Authorization': 'Bearer ' + token }
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    }
                 });
+
+                if (!response.ok) {
+                    const error = await response.text();
+                    console.error('API Error:', error);
+                    document.getElementById('users-list').textContent = 'Erreur: ' + error;
+                    return;
+                }
+
                 const data = await response.json();
 
                 const userSelect = document.getElementById('user-select');
@@ -438,6 +480,7 @@
                 document.getElementById('users-list').textContent = JSON.stringify(data, null, 2);
             } catch (error) {
                 console.error('Erreur:', error);
+                document.getElementById('users-list').textContent = 'Erreur: ' + error.message;
             }
         }
 
@@ -458,12 +501,26 @@
 
         // Messagerie
         async function getSalonMessages(salonId) {
+            if (!token) {
+                console.error('No token available');
+                return;
+            }
+
             try {
                 const response = await fetch(`http://localhost:8080/api/salons/${salonId}/messages`, {
-                    headers: { 'Authorization': 'Bearer ' + token }
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    }
                 });
+
+                if (!response.ok) {
+                    const error = await response.text();
+                    console.error('API Error:', error);
+                    return;
+                }
+
                 const messages = await response.json();
-                
                 const container = document.getElementById('salon-messages');
                 container.innerHTML = '';
                 
@@ -477,12 +534,26 @@
         }
 
         async function getPrivateMessages(userId) {
+            if (!token) {
+                console.error('No token available');
+                return;
+            }
+
             try {
                 const response = await fetch(`http://localhost:8080/api/messages/private/${userId}`, {
-                    headers: { 'Authorization': 'Bearer ' + token }
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    }
                 });
+
+                if (!response.ok) {
+                    const error = await response.text();
+                    console.error('API Error:', error);
+                    return;
+                }
+
                 const messages = await response.json();
-                
                 const container = document.getElementById('private-messages');
                 container.innerHTML = '';
                 
@@ -495,6 +566,7 @@
             }
         }
 
+        // Envoi de messages
         function sendSalonMessage() {
             const messageContent = document.getElementById('salon-message').value.trim();
             if (!messageContent) {
@@ -573,28 +645,38 @@
 
         // WebSocket
         function connectWebSocket() {
-            if (!token || stompClient) return;
+            if (!token) {
+                console.error('Vous devez être connecté pour utiliser WebSocket');
+                return;
+            }
+
+            if (stompClient && stompClient.connected) {
+                console.log('WebSocket déjà connecté');
+                return;
+            }
 
             const socket = new SockJS('http://localhost:8080/ws');
             stompClient = Stomp.over(socket);
             
             stompClient.connect(
-                { 'Authorization': 'Bearer ' + token }, 
+                { 
+                    'Authorization': 'Bearer ' + token
+                }, 
                 (frame) => {
                     console.log('Connected:', frame);
                     document.getElementById('ws-status').textContent = 'Connecté: ' + frame;
                     document.getElementById('ws-connect').disabled = true;
                     document.getElementById('ws-disconnect').disabled = false;
 
-                    // Abonnement aux messages privés
-                    stompClient.subscribe(`/user/${currentUser.id}/queue/private`, (message) => {
+                    // Subscribe to private messages
+                    stompClient.subscribe(`/queue/private/${currentUser.id}`, (message) => {
                         const msg = JSON.parse(message.body);
                         if (selectedUserId && (msg.senderId === selectedUserId || msg.recipientId === selectedUserId)) {
                             addMessageToChat(msg, document.getElementById('private-messages'), msg.senderId === currentUser.id);
                         }
                     });
 
-                    // Abonnement au salon courant
+                    // Subscribe to current salon if any
                     if (currentSalonId) {
                         subscribeToSalon(currentSalonId);
                     }
@@ -602,28 +684,42 @@
                 (error) => {
                     console.error('Erreur WebSocket:', error);
                     document.getElementById('ws-status').textContent = 'Erreur de connexion';
+                    disconnectWebSocket();
                     setTimeout(connectWebSocket, 5000); // Reconnexion automatique après 5s
                 }
             );
         }
 
-        function subscribeToSalon(salonId) {
-            if (!stompClient || !stompClient.connected) return;
-            
-            stompClient.subscribe(`/topic/room/${salonId}`, (message) => {
-                const msg = JSON.parse(message.body);
-                addMessageToChat(msg, document.getElementById('salon-messages'), msg.senderId === currentUser.id);
-            });
-        }
-
         function disconnectWebSocket() {
             if (stompClient) {
+                // Unsubscribe from all salon subscriptions
+                salonSubscriptions.forEach(subscription => subscription.unsubscribe());
+                salonSubscriptions.clear();
+
                 stompClient.disconnect();
                 stompClient = null;
                 document.getElementById('ws-status').textContent = 'Déconnecté';
                 document.getElementById('ws-connect').disabled = false;
                 document.getElementById('ws-disconnect').disabled = true;
             }
+        }
+
+        function subscribeToSalon(salonId) {
+            if (!stompClient || !stompClient.connected) return;
+
+            // Remove existing subscription if any
+            if (salonSubscriptions.has(salonId)) {
+                salonSubscriptions.get(salonId).unsubscribe();
+                salonSubscriptions.delete(salonId);
+            }
+
+            // Create new subscription
+            const subscription = stompClient.subscribe(`/topic/room/${salonId}`, (message) => {
+                const msg = JSON.parse(message.body);
+                addMessageToChat(msg, document.getElementById('salon-messages'), msg.senderId === currentUser.id);
+            });
+
+            salonSubscriptions.set(salonId, subscription);
         }
 
         // Utilitaires

@@ -58,15 +58,20 @@ public class JwtTokenProvider {
     }
 
     public String getEmailFromJWT(String token) {
-        Claims claims = Jwts.parserBuilder()
+        try {
+            Claims claims = Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
-
-        return claims.getSubject();
+                
+            return claims.getSubject(); // Doit retourner l'email
+            
+        } catch (ExpiredJwtException ex) {
+            return ex.getClaims().getSubject();
+        }
     }
-
+    
     public boolean validateToken(String authToken) {
         try {
             Jwts.parserBuilder()
@@ -74,17 +79,9 @@ public class JwtTokenProvider {
                 .build()
                 .parseClaimsJws(authToken);
             return true;
-        } catch (SignatureException ex) {
-            logger.error("Signature JWT invalide");
-        } catch (MalformedJwtException ex) {
-            logger.error("Token JWT invalide");
-        } catch (ExpiredJwtException ex) {
-            logger.error("Token JWT expiré");
-        } catch (UnsupportedJwtException ex) {
-            logger.error("Token JWT non supporté");
-        } catch (IllegalArgumentException ex) {
-            logger.error("JWT claims string est vide");
+        } catch (JwtException | IllegalArgumentException ex) {
+            logger.error("JWT Error: {}", ex.getMessage());
+            return false;
         }
-        return false;
     }
 }
