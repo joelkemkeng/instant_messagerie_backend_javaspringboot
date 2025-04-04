@@ -36,4 +36,7 @@ public class Message {
     @ManyToOne
     @JoinColumn(name = "destinataire_id")
     private User destinataire;
+    
+    @Column(name = "est_prive")
+    private Boolean estPrive = false;
 }
